@@ -18,7 +18,13 @@ services:
       - CONTAINER_ROLE=app
     depends_on:
       - db
-    command: bash -c "composer install && npm install && npm run build && php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=8000"
+    command: >
+      bash -c "
+        composer install && npm install && npm run build && 
+        php artisan migrate --force && 
+        php artisan db:seed --force --no-interaction && 
+        php artisan serve --host=0.0.0.0 --port=8000
+      "
     restart: unless-stopped
 
   db:

@@ -173,7 +173,7 @@ case "$1" in
         if docker exec laravel_app test -d /var/www/html/database/migrations &>/dev/null; then
           echo "Running database migrations and seeders..."
           docker exec laravel_app php /var/www/html/artisan migrate --force
-          docker exec laravel_app php /var/www/html/artisan db:seed --force
+          docker exec laravel_app php /var/www/html/artisan db:seed --force --no-interaction
         fi
         
         docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
@@ -356,7 +356,7 @@ case "$1" in
     fi
     
     echo "Running database seeders..."
-    docker exec laravel_app php /var/www/html/artisan db:seed --force
+    docker exec laravel_app php /var/www/html/artisan db:seed --force --no-interaction
     ;;
     
   db-refresh)
@@ -375,7 +375,7 @@ case "$1" in
     docker exec laravel_app php /var/www/html/artisan migrate:fresh --force
     
     echo "Running database seeders..."
-    docker exec laravel_app php /var/www/html/artisan db:seed --force
+    docker exec laravel_app php /var/www/html/artisan db:seed --force --no-interaction
     
     echo "Generating todo instances..."
     docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
