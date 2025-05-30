@@ -15,11 +15,13 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        // Use firstOrCreate instead of create to avoid duplicate entries
-        User::factory()->firstOrCreate(
-            ['email' => 'test@example.com'],
-            ['name' => 'Test User']
-        );
+        // Check if the test user exists before creating it
+        if (!User::where('email', 'test@example.com')->exists()) {
+            User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+            ]);
+        }
 
         $this->call([
             GuestUserSeeder::class,
