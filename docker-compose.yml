@@ -20,7 +20,9 @@ services:
       - db
     command: >
       bash -c "
-        composer install && npm install && npm run build && 
+        composer install && 
+        npm install && 
+        if [ -f node_modules/.vite/package.json ]; then npm run build; else npm ci && npm run build; fi && 
         php artisan migrate --force && 
         php artisan db:seed --force --no-interaction && 
         php artisan serve --host=0.0.0.0 --port=8000

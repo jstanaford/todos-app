@@ -166,7 +166,7 @@ case "$1" in
         # Check if the Vite manifest exists, if not, build assets
         if ! docker exec laravel_app test -f /var/www/html/public/build/manifest.json &>/dev/null; then
           echo "Vite manifest not found. Building assets..."
-          docker exec laravel_app bash -c "cd /var/www/html && npm run build"
+          docker exec laravel_app bash -c "cd /var/www/html && npm install && npm run build"
         fi
         
         # Check if migrations need to be run (look for migration files)
@@ -320,10 +320,10 @@ case "$1" in
     fi
     
     echo "Building assets in src directory..."
-    (cd src && npm run build) || echo "Failed to build assets in src directory. You may need to run 'cd src && npm run build' manually."
+    (cd src && npm install && npm run build) || echo "Failed to build assets in src directory. You may need to run 'cd src && npm run build' manually."
     
     echo "Building assets in container..."
-    docker exec laravel_app bash -c "cd /var/www/html && npm install && npm run build"
+    docker exec laravel_app bash -c "cd /var/www/html && npm install && npm install vite --save-dev && npm run build"
     
     # Verify the manifest was created
     if docker exec laravel_app test -f /var/www/html/public/build/manifest.json; then
@@ -331,7 +331,7 @@ case "$1" in
     else
       echo "❌ Warning: Vite manifest not created. There may be an issue with the build process."
       echo "Try running the following commands directly:"
-      echo "docker exec -it laravel_app bash -c 'cd /var/www/html && npm run build'"
+      echo "docker exec -it laravel_app bash -c 'cd /var/www/html && npm install && npm install vite --save-dev && npm run build'"
     fi
     ;;
   logs)
@@ -380,10 +380,28 @@ case "$1" in
     echo "Generating todo instances..."
     docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
     ;;
+    
+  fix-vite)
+    check_docker
+    
+    echo "Fixing Vite installation in the container..."
+    docker exec laravel_app bash -c "cd /var/www/html && npm install && npm install vite --save-dev && npm install @vitejs/plugin-vue --save-dev && npm run build"
+    
+    echo "Fixing Vite installation in the source directory..."
+    (cd src && npm install && npm install vite --save-dev && npm install @vitejs/plugin-vue --save-dev && npm run build) || echo "Failed to fix Vite in src directory. You may need to run 'cd src && npm install && npm install vite --save-dev && npm run build' manually."
+    
+    # Verify the manifest was created
+    if docker exec laravel_app test -f /var/www/html/public/build/manifest.json; then
+      echo "✅ Vite manifest successfully created."
+    else
+      echo "❌ Warning: Vite manifest not created. There may be an issue with the build process."
+    fi
+    ;;
+    
   *)
     echo "Todo List Scheduler Management Tool"
     echo ""
-    echo "Usage: $0 {start|stop|restart|restart-app|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]|db-seed|db-refresh}"
+    echo "Usage: $0 {start|stop|restart|restart-app|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]|db-seed|db-refresh|fix-vite}"
     echo ""
     echo "Commands:"
     echo "  start               Set up and start all containers"
@@ -399,6 +417,7 @@ case "$1" in
     echo "  logs [scheduler]    View logs (specify 'scheduler' to view scheduler logs)"
     echo "  db-seed             Run database seeders"
     echo "  db-refresh          Refresh the database (all data will be lost)"
+    echo "  fix-vite            Fix Vite installation in the container and source directory"
     echo ""
     exit 1
     ;;
