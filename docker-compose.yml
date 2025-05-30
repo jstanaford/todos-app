@@ -14,13 +14,16 @@ services:
       - DB_DATABASE=todo
       - DB_USERNAME=todo
       - DB_PASSWORD=secret
+      - APP_ENV=local
+      - CONTAINER_ROLE=app
     depends_on:
       - db
-    command: bash -c "composer install && npm install && php artisan serve --host=0.0.0.0 --port=8000"
+    command: bash -c "composer install && npm install && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+    restart: unless-stopped
 
   db:
     image: mariadb:11.3
-    container_name: mariadb
+    container_name: mariadb_todo
     environment:
       - MYSQL_ROOT_PASSWORD=secret
       - MYSQL_DATABASE=todo
@@ -31,7 +34,7 @@ services:
       - db_data:/var/lib/mysql
     ports:
       - "3306:3306"
-    command: --init-file /docker-entrypoint-initdb.d/main.sql
+    command: --init-file /docker-entrypoint-initdb.d/main_todos.sql
 
 volumes:
   db_data: 

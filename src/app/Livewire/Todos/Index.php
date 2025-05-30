@@ -4,23 +4,34 @@ namespace App\Livewire\Todos;
 
 use App\Models\Todo;
 use App\Models\Category;
+use App\Models\TodoInstance;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
+use Carbon\Carbon;
 
+#[Layout('layouts.app')]
 class Index extends Component
 {
     use WithPagination;
 
-    protected $layout = 'layouts.app';
-    
     public $categoryId = '';
     public $completed = '';
+    public $selectedDate;
+    public $showDatePicker = false;
     
     protected $queryString = [
         'categoryId' => ['except' => ''],
         'completed' => ['except' => ''],
+        'selectedDate' => ['except' => ''],
     ];
+    
+    public function mount()
+    {
+        // Set default selected date to today
+        $this->selectedDate = $this->selectedDate ?: Carbon::today()->format('Y-m-d');
+    }
     
     public function updatingCategoryId()
     {
@@ -28,6 +39,11 @@ class Index extends Component
     }
     
     public function updatingCompleted()
+    {
+        $this->resetPage();
+    }
+    
+    public function updatingSelectedDate()
     {
         $this->resetPage();
     }
@@ -60,8 +76,19 @@ class Index extends Component
 
     public function render()
     {
+        // Ensure selectedDate is a Carbon instance
+        $carbonDate = Carbon::parse($this->selectedDate);
+        
         $query = Todo::query()->with('category')
-            ->where('user_id', Auth::id());
+            ->where('user_id', Auth::id())
+            ->where(function ($query) use ($carbonDate) {
+                // Get todos due on the selected date
+                $query->whereDate('due_date', $carbonDate)
+                    // Or get recurring todos with instances on the selected date
+                    ->orWhereHas('instances', function ($q) use ($carbonDate) {
+                        $q->whereDate('due_date', $carbonDate);
+                    });
+            });
         
         // Filter by category if provided
         if ($this->categoryId) {
@@ -79,6 +106,7 @@ class Index extends Component
         return view('livewire.todos.index', [
             'todos' => $todos,
             'categories' => $categories,
+            'selectedDate' => $carbonDate,
         ]);
     }
 }

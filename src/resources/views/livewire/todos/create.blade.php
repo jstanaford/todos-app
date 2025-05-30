@@ -9,7 +9,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
-                    <form wire:submit="save">
+                    <form wire:submit.prevent="save">
                         <!-- Title -->
                         <div class="mb-4">
                             <x-input-label for="todo_title" :value="__('Title')" />
@@ -34,26 +34,24 @@
                         <!-- Recurring -->
                         <div class="mb-4">
                             <div class="flex items-center">
-                                <input wire:model="recurring" id="recurring" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <input wire:model.live="recurring" id="recurring" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                 <x-input-label for="recurring" :value="__('Recurring')" class="ml-2" />
                             </div>
                             <x-input-error :messages="$errors->get('recurring')" class="mt-2" />
                         </div>
                         
                         <!-- Recurring Schedule -->
-                        <div class="mb-4" x-data="{ open: @entangle('recurring') }">
-                            <div x-show="open">
-                                <x-input-label for="recurring_schedule" :value="__('Recurring Schedule')" />
-                                <select wire:model="recurring_schedule" id="recurring_schedule" name="recurring_schedule" class="block mt-1 w-full rounded-md shadow-sm border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                    <option value="">Select Schedule</option>
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                    <option value="monthly">Monthly</option>
-                                    <option value="yearly">Yearly</option>
-                                    <option value="custom">Custom</option>
-                                </select>
-                                <x-input-error :messages="$errors->get('recurring_schedule')" class="mt-2" />
-                            </div>
+                        <div class="mb-4" x-show="$wire.recurring">
+                            <x-input-label for="recurring_schedule" :value="__('Recurring Schedule')" />
+                            <select wire:model="recurring_schedule" id="recurring_schedule" name="recurring_schedule" class="block mt-1 w-full rounded-md shadow-sm border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <option value="">Select Schedule</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('recurring_schedule')" class="mt-2" />
                         </div>
                         
                         <!-- Category -->

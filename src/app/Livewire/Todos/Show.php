@@ -5,11 +5,11 @@ namespace App\Livewire\Todos;
 use App\Models\Todo;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
 
+#[Layout('layouts.app')]
 class Show extends Component
 {
-    protected $layout = 'layouts.app';
-    
     public Todo $todo;
     
     public function mount(Todo $todo)

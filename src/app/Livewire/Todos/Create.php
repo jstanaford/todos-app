@@ -7,11 +7,11 @@ use App\Models\Category;
 use App\Models\TodoInstance;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
 
+#[Layout('layouts.app')]
 class Create extends Component
 {
-    protected $layout = 'layouts.app';
-    
     public $todo_title = '';
     public $details = '';
     public $due_date = '';
@@ -19,14 +19,27 @@ class Create extends Component
     public $recurring_schedule = '';
     public $category_id = '';
     
-    protected $rules = [
-        'todo_title' => 'required|string|max:255',
-        'details' => 'nullable|string',
-        'due_date' => 'required|date',
-        'recurring' => 'boolean',
-        'recurring_schedule' => 'required_if:recurring,true|nullable|string',
-        'category_id' => 'nullable|exists:categories,id',
-    ];
+    protected function rules()
+    {
+        return [
+            'todo_title' => 'required|string|max:255',
+            'details' => 'nullable|string',
+            'due_date' => 'required|date',
+            'recurring' => 'boolean',
+            'recurring_schedule' => $this->recurring ? 'required|string' : 'nullable|string',
+            'category_id' => 'nullable|exists:categories,id',
+        ];
+    }
+    
+    public function updated($propertyName)
+    {
+        $this->validateOnly($propertyName);
+        
+        // If recurring is toggled off, reset the recurring_schedule
+        if ($propertyName === 'recurring' && !$this->recurring) {
+            $this->recurring_schedule = '';
+        }
+    }
     
     public function mount()
     {
@@ -38,30 +51,34 @@ class Create extends Component
     {
         $this->validate();
         
-        // Create the todo
-        $todo = Todo::create([
-            'user_id' => Auth::id(),
-            'todo_title' => $this->todo_title,
-            'details' => $this->details,
-            'due_date' => $this->due_date,
-            'recurring' => $this->recurring,
-            'recurring_schedule' => $this->recurring_schedule,
-            'category_id' => $this->category_id ?: null,
-            'complete' => false,
-        ]);
-        
-        // If todo is recurring, create the first instance
-        if ($todo->recurring) {
-            TodoInstance::create([
-                'todo_id' => $todo->id,
-                'due_date' => $todo->due_date,
+        try {
+            // Create the todo
+            $todo = Todo::create([
+                'user_id' => Auth::id(),
+                'todo_title' => $this->todo_title,
+                'details' => $this->details,
+                'due_date' => $this->due_date,
+                'recurring' => $this->recurring,
+                'recurring_schedule' => $this->recurring ? $this->recurring_schedule : null,
+                'category_id' => $this->category_id ?: null,
                 'complete' => false,
             ]);
+            
+            // If todo is recurring, create the first instance
+            if ($todo->recurring && $todo->recurring_schedule) {
+                TodoInstance::create([
+                    'todo_id' => $todo->id,
+                    'due_date' => $todo->due_date,
+                    'complete' => false,
+                ]);
+            }
+            
+            session()->flash('success', 'Todo created successfully.');
+            
+            $this->redirectRoute('todos.index');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Error creating todo: ' . $e->getMessage());
         }
-        
-        session()->flash('success', 'Todo created successfully.');
-        
-        return redirect()->route('todos.index');
     }
     
     public function render()
