@@ -70,6 +70,31 @@ function perform_setup() {
   echo "Setup complete!"
 }
 
+# Wait for container to be ready
+function wait_for_container() {
+  local container=$1
+  local max_attempts=$2
+  local delay=$3
+  local check_command=$4
+  
+  echo "Waiting for $container to be ready..."
+  
+  for ((i=1; i<=max_attempts; i++)); do
+    echo "Attempt $i of $max_attempts..."
+    
+    if docker exec $container $check_command &>/dev/null; then
+      echo "$container is ready!"
+      return 0
+    fi
+    
+    echo "Still waiting for $container... (sleeping for $delay seconds)"
+    sleep $delay
+  done
+  
+  echo "Timed out waiting for $container to be ready"
+  return 1
+}
+
 # Setup a cron job on the host machine to run the scheduler
 function setup_cron() {
   local cron_exists=$(crontab -l 2>/dev/null | grep -c "todo-list-scheduler" || true)
@@ -127,13 +152,25 @@ case "$1" in
     echo "Starting containers..."
     docker compose up -d
     
-    echo "Waiting for services to initialize..."
-    sleep 5
+    echo "Waiting for containers to initialize..."
     
-    echo "Running initial todo instance generation..."
-    docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730 || echo "Warning: Could not generate initial todo instances. Try running './manage.sh generate-instances' manually after a few moments."
-  
-
+    # Wait for the Laravel app container to be ready with Composer dependencies installed
+    # Try for up to 2 minutes (12 attempts with 10 second delay)
+    if wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor"; then
+      echo "Dependencies installed successfully."
+      
+      # Now wait for the Laravel artisan command to be available
+      if wait_for_container laravel_app 3 5 "php /var/www/html/artisan --version"; then
+        echo "Laravel is ready. Running initial todo instance generation..."
+        docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
+      else
+        echo "Warning: Laravel does not appear to be ready. Try running './manage.sh generate-instances' manually after a few moments."
+      fi
+    else
+      echo "Warning: Dependencies installation is taking longer than expected."
+      echo "You may need to wait a bit longer and then run './manage.sh generate-instances' manually."
+    fi
+    
     echo "All services started!"
     echo "Access the application at: http://localhost:8000"
     ;;
@@ -152,17 +189,41 @@ case "$1" in
     perform_setup
     
     docker compose up -d
+    
+    echo "Waiting for containers to initialize..."
+    wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || true
+    
     echo "Containers restarted."
     echo "Access the application at: http://localhost:8000"
     ;;
   generate-instances)
     check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
+        exit 1
+      }
+    fi
+    
     DAYS=${2:-730}
     echo "Generating todo instances for $DAYS days..."
     docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=${DAYS}
     ;;
   run-scheduler)
     check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
+        exit 1
+      }
+    fi
+    
     # Run the scheduler task directly on the Laravel app container
     echo "Running scheduler manually..."
     docker exec laravel_app php /var/www/html/artisan schedule:run --verbose
@@ -175,6 +236,16 @@ case "$1" in
     ;;
   clear-cache)
     check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
+        exit 1
+      }
+    }
+    
     echo "Clearing Laravel cache..."
     docker exec laravel_app php /var/www/html/artisan cache:clear
     docker exec laravel_app php /var/www/html/artisan config:clear
@@ -202,6 +273,15 @@ case "$1" in
     ;;
   build-assets)
     check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Warning: Dependencies may not be fully installed. Proceeding anyway..."
+      }
+    fi
+    
     echo "Building assets in src directory..."
     (cd src && npm run build) || echo "Failed to build assets. Make sure Node.js and npm are installed in the src directory."
     
