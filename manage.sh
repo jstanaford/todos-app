@@ -66,8 +66,6 @@ function perform_setup() {
   ensure_db_file
   ensure_scheduler_files
   ensure_env_file
-
-  build-assets
   
   echo "Setup complete!"
 }
@@ -134,9 +132,8 @@ case "$1" in
     
     echo "Running initial todo instance generation..."
     docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730 || echo "Warning: Could not generate initial todo instances. Try running './manage.sh generate-instances' manually after a few moments."
-    
-    build-assets
-    
+  
+
     echo "All services started!"
     echo "Access the application at: http://localhost:8000"
     ;;
