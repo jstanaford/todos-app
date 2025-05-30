@@ -23,7 +23,7 @@ A web-based application for managing recurring tasks and to-do items with automa
    cd todo-list-scheduler
    ```
 
-2. Run the setup script:
+2. Run the start script (this will handle all setup and initialization):
    ```bash
    chmod +x manage.sh
    ./manage.sh start
@@ -35,10 +35,9 @@ A web-based application for managing recurring tasks and to-do items with automa
 
 The `manage.sh` script provides various commands to help you manage the application:
 
-- `./manage.sh setup` - Perform initial setup without starting containers
-- `./manage.sh start` - Set up and start all containers
+- `./manage.sh start` - Set up and start all containers (includes automatic initialization)
 - `./manage.sh stop` - Stop all containers
-- `./manage.sh restart` - Restart all containers
+- `./manage.sh restart` - Restart all containers (includes automatic re-initialization)
 - `./manage.sh generate-instances [days]` - Generate todo instances for the specified number of days (default: 730)
 - `./manage.sh run-scheduler` - Run the Laravel scheduler manually
 - `./manage.sh setup-cron` - Set up a cron job on the host machine to run the scheduler

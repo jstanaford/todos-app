@@ -60,12 +60,14 @@ function ensure_env_file() {
 }
 
 # Perform initial setup
-function initial_setup() {
+function perform_setup() {
   echo "Performing initial setup..."
   
   ensure_db_file
   ensure_scheduler_files
   ensure_env_file
+
+  build-assets
   
   echo "Setup complete!"
 }
@@ -118,14 +120,12 @@ function remove_cron() {
 }
 
 case "$1" in
-  setup)
-    # Initial setup without starting containers
-    initial_setup
-    echo "Initial setup complete. Run './manage.sh start' to start the application."
-    ;;
   start)
     check_docker
-    initial_setup
+    
+    # Always run setup during start
+    perform_setup
+    
     echo "Starting containers..."
     docker compose up -d
     
@@ -134,6 +134,8 @@ case "$1" in
     
     echo "Running initial todo instance generation..."
     docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730 || echo "Warning: Could not generate initial todo instances. Try running './manage.sh generate-instances' manually after a few moments."
+    
+    build-assets
     
     echo "All services started!"
     echo "Access the application at: http://localhost:8000"
@@ -148,7 +150,10 @@ case "$1" in
     check_docker
     echo "Restarting containers..."
     docker compose down
-    initial_setup
+    
+    # Always run setup during restart
+    perform_setup
+    
     docker compose up -d
     echo "Containers restarted."
     echo "Access the application at: http://localhost:8000"
@@ -218,10 +223,9 @@ case "$1" in
   *)
     echo "Todo List Scheduler Management Tool"
     echo ""
-    echo "Usage: $0 {setup|start|stop|restart|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]}"
+    echo "Usage: $0 {start|stop|restart|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]}"
     echo ""
     echo "Commands:"
-    echo "  setup               Perform initial setup without starting containers"
     echo "  start               Set up and start all containers"
     echo "  stop                Stop all containers"
     echo "  restart             Restart all containers"
