@@ -244,7 +244,7 @@ case "$1" in
         echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
         exit 1
       }
-    }
+    fi
     
     echo "Clearing Laravel cache..."
     docker exec laravel_app php /var/www/html/artisan cache:clear
