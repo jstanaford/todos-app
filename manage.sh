@@ -169,6 +169,13 @@ case "$1" in
           docker exec laravel_app bash -c "cd /var/www/html && npm run build"
         fi
         
+        # Check if migrations need to be run (look for migration files)
+        if docker exec laravel_app test -d /var/www/html/database/migrations &>/dev/null; then
+          echo "Running database migrations and seeders..."
+          docker exec laravel_app php /var/www/html/artisan migrate --force
+          docker exec laravel_app php /var/www/html/artisan db:seed --force
+        fi
+        
         docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
       else
         echo "Warning: Laravel does not appear to be ready. Try running './manage.sh generate-instances' manually after a few moments."
@@ -336,10 +343,47 @@ case "$1" in
       docker compose logs -f
     fi
     ;;
+  db-seed)
+    check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
+        exit 1
+      }
+    fi
+    
+    echo "Running database seeders..."
+    docker exec laravel_app php /var/www/html/artisan db:seed --force
+    ;;
+    
+  db-refresh)
+    check_docker
+    
+    # Check if we need to wait for dependencies
+    if ! docker exec laravel_app test -d /var/www/html/vendor &>/dev/null; then
+      echo "Waiting for Composer dependencies to be installed..."
+      wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || {
+        echo "Error: Dependencies not installed. Please check the container logs with './manage.sh logs'"
+        exit 1
+      }
+    fi
+    
+    echo "Refreshing the database (all data will be lost)..."
+    docker exec laravel_app php /var/www/html/artisan migrate:fresh --force
+    
+    echo "Running database seeders..."
+    docker exec laravel_app php /var/www/html/artisan db:seed --force
+    
+    echo "Generating todo instances..."
+    docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
+    ;;
   *)
     echo "Todo List Scheduler Management Tool"
     echo ""
-    echo "Usage: $0 {start|stop|restart|restart-app|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]}"
+    echo "Usage: $0 {start|stop|restart|restart-app|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]|db-seed|db-refresh}"
     echo ""
     echo "Commands:"
     echo "  start               Set up and start all containers"
@@ -353,6 +397,8 @@ case "$1" in
     echo "  clear-cache         Clear Laravel and asset caches"
     echo "  build-assets        Build frontend assets"
     echo "  logs [scheduler]    View logs (specify 'scheduler' to view scheduler logs)"
+    echo "  db-seed             Run database seeders"
+    echo "  db-refresh          Refresh the database (all data will be lost)"
     echo ""
     exit 1
     ;;

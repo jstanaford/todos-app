@@ -38,6 +38,7 @@ The `manage.sh` script provides various commands to help you manage the applicat
 - `./manage.sh start` - Set up and start all containers (includes automatic initialization)
 - `./manage.sh stop` - Stop all containers
 - `./manage.sh restart` - Restart all containers (includes automatic re-initialization)
+- `./manage.sh restart-app` - Restart only the Laravel app container (faster than full restart)
 - `./manage.sh generate-instances [days]` - Generate todo instances for the specified number of days (default: 730)
 - `./manage.sh run-scheduler` - Run the Laravel scheduler manually
 - `./manage.sh setup-cron` - Set up a cron job on the host machine to run the scheduler
@@ -77,6 +78,30 @@ If you make changes to frontend assets, rebuild them using:
 ./manage.sh build-assets
 ```
 
+This command ensures that:
+1. Node.js dependencies are installed
+2. Vite builds the assets correctly
+3. The manifest file is created properly
+
+### Asset Issues
+
+If you encounter issues with assets not loading:
+
+1. Check that the Vite manifest exists:
+   ```bash
+   docker exec laravel_app test -f /var/www/html/public/build/manifest.json && echo "Manifest exists" || echo "Manifest missing"
+   ```
+
+2. Rebuild the assets:
+   ```bash
+   ./manage.sh build-assets
+   ```
+
+3. If issues persist, try restarting just the app:
+   ```bash
+   ./manage.sh restart-app
+   ```
+
 ### Clearing Cache
 
 To clear all caches after making changes:
@@ -90,9 +115,10 @@ To clear all caches after making changes:
 If you encounter issues:
 
 1. Check the logs: `./manage.sh logs`
-2. Restart the containers: `./manage.sh restart`
+2. Restart the containers: `./manage.sh restart` or `./manage.sh restart-app`
 3. Clear the caches: `./manage.sh clear-cache`
-4. Ensure your Docker installation is working properly
+4. Rebuild assets: `./manage.sh build-assets`
+5. Ensure your Docker installation is working properly
 
 ## License
 
