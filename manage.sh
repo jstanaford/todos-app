@@ -162,6 +162,13 @@ case "$1" in
       # Now wait for the Laravel artisan command to be available
       if wait_for_container laravel_app 3 5 "php /var/www/html/artisan --version"; then
         echo "Laravel is ready. Running initial todo instance generation..."
+        
+        # Check if the Vite manifest exists, if not, build assets
+        if ! docker exec laravel_app test -f /var/www/html/public/build/manifest.json &>/dev/null; then
+          echo "Vite manifest not found. Building assets..."
+          docker exec laravel_app bash -c "cd /var/www/html && npm run build"
+        fi
+        
         docker exec laravel_app php /var/www/html/artisan todos:generate-instances --days=730
       else
         echo "Warning: Laravel does not appear to be ready. Try running './manage.sh generate-instances' manually after a few moments."
@@ -194,6 +201,29 @@ case "$1" in
     wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || true
     
     echo "Containers restarted."
+    echo "Access the application at: http://localhost:8000"
+    ;;
+  restart-app)
+    check_docker
+    echo "Restarting Laravel app container..."
+    
+    # Stop and remove only the Laravel app container
+    docker stop laravel_app
+    docker rm laravel_app
+    
+    # Start the container again
+    docker compose up -d app
+    
+    echo "Waiting for Laravel app to initialize..."
+    wait_for_container laravel_app 12 10 "test -d /var/www/html/vendor" || true
+    
+    # Check if the Vite manifest exists, if not, build assets
+    if ! docker exec laravel_app test -f /var/www/html/public/build/manifest.json &>/dev/null; then
+      echo "Vite manifest not found. Building assets..."
+      docker exec laravel_app bash -c "cd /var/www/html && npm install && npm run build"
+    fi
+    
+    echo "Laravel app container restarted."
     echo "Access the application at: http://localhost:8000"
     ;;
   generate-instances)
@@ -283,10 +313,19 @@ case "$1" in
     fi
     
     echo "Building assets in src directory..."
-    (cd src && npm run build) || echo "Failed to build assets. Make sure Node.js and npm are installed in the src directory."
+    (cd src && npm run build) || echo "Failed to build assets in src directory. You may need to run 'cd src && npm run build' manually."
     
     echo "Building assets in container..."
-    docker exec laravel_app bash -c "cd /var/www/html && if command -v npm &> /dev/null; then npm run build; else echo 'npm not available in container'; fi"
+    docker exec laravel_app bash -c "cd /var/www/html && npm install && npm run build"
+    
+    # Verify the manifest was created
+    if docker exec laravel_app test -f /var/www/html/public/build/manifest.json; then
+      echo "✅ Vite manifest successfully created."
+    else
+      echo "❌ Warning: Vite manifest not created. There may be an issue with the build process."
+      echo "Try running the following commands directly:"
+      echo "docker exec -it laravel_app bash -c 'cd /var/www/html && npm run build'"
+    fi
     ;;
   logs)
     check_docker
@@ -300,12 +339,13 @@ case "$1" in
   *)
     echo "Todo List Scheduler Management Tool"
     echo ""
-    echo "Usage: $0 {start|stop|restart|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]}"
+    echo "Usage: $0 {start|stop|restart|restart-app|generate-instances [days]|run-scheduler|setup-cron|remove-cron|clear-cache|build-assets|logs [scheduler]}"
     echo ""
     echo "Commands:"
     echo "  start               Set up and start all containers"
     echo "  stop                Stop all containers"
     echo "  restart             Restart all containers"
+    echo "  restart-app         Restart the Laravel app container"
     echo "  generate-instances  Generate todo instances for the specified number of days (default: 730)"
     echo "  run-scheduler       Run the Laravel scheduler manually"
     echo "  setup-cron          Set up a cron job on the host machine to run the scheduler"
