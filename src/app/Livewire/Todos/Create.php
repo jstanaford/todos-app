@@ -19,6 +19,10 @@ class Create extends Component
     public $recurring_schedule = '';
     public $category_id = '';
     
+    // New category modal properties
+    public $showCategoryModal = false;
+    public $new_category_title = '';
+    
     protected function rules()
     {
         return [
@@ -28,16 +32,21 @@ class Create extends Component
             'recurring' => 'boolean',
             'recurring_schedule' => $this->recurring ? 'required|string' : 'nullable|string',
             'category_id' => 'nullable|exists:categories,id',
+            'new_category_title' => 'required|string|min:3|max:255',
         ];
     }
     
     public function updated($propertyName)
     {
-        $this->validateOnly($propertyName);
+        if ($propertyName === 'new_category_title') {
+            $this->validateOnly('new_category_title');
+        } else {
+            $this->validateOnly($propertyName);
         
-        // If recurring is toggled off, reset the recurring_schedule
-        if ($propertyName === 'recurring' && !$this->recurring) {
-            $this->recurring_schedule = '';
+            // If recurring is toggled off, reset the recurring_schedule
+            if ($propertyName === 'recurring' && !$this->recurring) {
+                $this->recurring_schedule = '';
+            }
         }
     }
     
@@ -45,6 +54,38 @@ class Create extends Component
     {
         // Set default due date to tomorrow
         $this->due_date = now()->addDay()->format('Y-m-d');
+    }
+    
+    public function openCategoryModal()
+    {
+        $this->showCategoryModal = true;
+    }
+    
+    public function closeCategoryModal()
+    {
+        $this->showCategoryModal = false;
+        $this->new_category_title = '';
+        $this->resetValidation('new_category_title');
+    }
+    
+    public function saveCategory()
+    {
+        $this->validate([
+            'new_category_title' => 'required|string|min:3|max:255',
+        ]);
+        
+        // Create new category
+        $category = Category::create([
+            'category_title' => $this->new_category_title,
+        ]);
+        
+        // Set the newly created category as selected
+        $this->category_id = $category->id;
+        
+        $this->closeCategoryModal();
+        
+        // Show success notification
+        session()->flash('category_success', 'Category created successfully!');
     }
     
     public function save()
@@ -84,7 +125,7 @@ class Create extends Component
     public function render()
     {
         return view('livewire.todos.create', [
-            'categories' => Category::all(),
+            'categories' => Category::orderBy('category_title')->get(),
         ]);
     }
 }
