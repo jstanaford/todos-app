@@ -6,6 +6,7 @@ use App\Models\Todo;
 use App\Models\Category;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 
 #[Layout('layouts.app')]
@@ -26,13 +27,12 @@ class Edit extends Component
     protected function rules()
     {
         return [
-            'todo_title' => 'required|string|max:255',
-            'details' => 'nullable|string',
-            'due_date' => 'required|date',
-            'recurring' => 'boolean',
-            'recurring_schedule' => $this->recurring ? 'required|string' : 'nullable|string',
-            'category_id' => 'nullable|exists:categories,id',
-            'new_category_title' => 'required|string|min:3|max:255',
+            'todo_title' => ['required', 'string', 'max:255'],
+            'details' => ['nullable', 'string'],
+            'due_date' => ['required', 'date'],
+            'recurring' => ['boolean'],
+            'recurring_schedule' => $this->recurring ? ['required', 'string', 'in:daily,weekly,monthly,yearly,custom'] : ['nullable', 'string'],
+            'category_id' => ['nullable', 'exists:categories,id'],
         ];
     }
     
@@ -104,23 +104,61 @@ class Edit extends Component
     
     public function update()
     {
-        $this->validate();
-        
         try {
-            // Update the todo
-            $this->todo->update([
-                'todo_title' => $this->todo_title,
-                'details' => $this->details,
-                'due_date' => $this->due_date,
-                'recurring' => $this->recurring,
-                'recurring_schedule' => $this->recurring ? $this->recurring_schedule : null,
-                'category_id' => $this->category_id ?: null,
+            // Log the incoming data for debugging
+            Log::info('Todo update attempt', [
+                'todo_id' => $this->todo->id,
+                'data' => [
+                    'todo_title' => $this->todo_title,
+                    'details' => $this->details,
+                    'due_date' => $this->due_date,
+                    'recurring' => $this->recurring,
+                    'recurring_schedule' => $this->recurring_schedule,
+                    'category_id' => $this->category_id,
+                ]
             ]);
+
+            // Explicitly validate each field
+            $rules = $this->rules();
+            $validated = $this->validate($rules);
             
+            Log::info('Validation passed', ['validated_data' => $validated]);
+
+            // Update the todo with validated data
+            $updateData = [
+                'todo_title' => $validated['todo_title'],
+                'details' => $validated['details'],
+                'due_date' => $validated['due_date'],
+                'recurring' => $validated['recurring'],
+                'recurring_schedule' => $validated['recurring'] ? $validated['recurring_schedule'] : null,
+                'category_id' => $validated['category_id'] ?: null,
+            ];
+
+            Log::info('Attempting to update todo', ['update_data' => $updateData]);
+            
+            $updated = $this->todo->update($updateData);
+            
+            if (!$updated) {
+                Log::error('Todo update failed - model update returned false');
+                session()->flash('error', 'Failed to update todo. Please try again.');
+                return;
+            }
+
+            Log::info('Todo updated successfully');
             session()->flash('success', 'Todo updated successfully.');
             
-            return $this->redirectRoute('todos.index');
+            return redirect()->route('todos.index');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation failed', [
+                'errors' => $e->errors(),
+                'data' => $this->only(['todo_title', 'details', 'due_date', 'recurring', 'recurring_schedule', 'category_id'])
+            ]);
+            throw $e;
         } catch (\Exception $e) {
+            Log::error('Todo update failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             session()->flash('error', 'Error updating todo: ' . $e->getMessage());
         }
     }
